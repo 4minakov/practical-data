@@ -29,32 +29,32 @@ figure, imshow(I3), title('Selected area')
 I4 = imsharpen(I3);
 figure, imshow(I4), title('Sharpened image')
 %% adaptive histogram equilization (CLAHE)
-I4 = adapthisteq(I3,'ClipLimit',0.1,'Distribution','Rayleigh');
-figure, imshow(I4), title('Enhanced contrast')
+I5 = adapthisteq(I4,'ClipLimit',0.1,'Distribution','Rayleigh');
+figure, imshow(I5), title('Enhanced contrast')
 %% median filter to remove speck noise
-I5 = medfilt2(I4);
-figure, imshow(I5), title('Denoised image')
+I6 = medfilt2(I5);
+figure, imshow(I6), title('Denoised image')
 %% Find edges in the image
 % The Canny method finds edges by looking for local maxima of the gradient of image. 
 % Parameter 1: upper threshold for detection
 % Parameter 2: the standard deviation of the Gaussian filter to compute
 % gradient magnitude
-I6 = edge(I5,'canny',0.4, 3);
-figure, imshow(I6), title('Edges detected')
+I7 = edge(I6,'canny',0.4, 3);
+figure, imshow(I7), title('Edges detected')
 %% circle detection using Hough transform
-[centers, radii] = imfindcircles(I6, [5 30], 'Sensitivity', 0.85);
+[centers, radii] = imfindcircles(I7, [5 30], 'Sensitivity', 0.85);
 % The routine finds circles with radii in the search range [MIN_RADIUS MAX_RADIUS]
 % Sensitivity factor for finding circles in the range [0 1].
 % A high sensitivity detecting more circles at the risk of a higher false detection rate.
 %% Draw the detected circles
 figure,
-subplot(131),imshow(I6);
+subplot(131),imshow(I7);
 hold on, axis on;
 plot(centers(:,1), centers(:,2), '+b');
-subplot(132),imshow(I5);
+subplot(132),imshow(I6);
 viscircles(centers, radii, 'EdgeColor', 'b');
 hold on, axis on
-subplot(133),imshow(I5);
+subplot(133),imshow(I6);
 hold on, plot(centers(:,1), centers(:,2), '+b'), axis on
 %% crater statistics
 % approximate conversion of pixels to km
@@ -81,8 +81,30 @@ xlabel('log(Crater Diameter) (km)');
 ylabel('log(Crater Frequency)');
 title(['A = ', num2str(k_fit(2)), ', k = ', num2str(k_fit(1))]);
 set(gca, 'XScale', 'log', 'YScale', 'log');
+%% Determine age of the Moon surface
+% using empirically derived eq by Neukum and Ivanov (1994). 
 
-%%  testing 
+bins = 15:6:40; % array of bins
+Ncum = zeros(length(bins),1); % initialize array of cumulative frequency
+S = prod(size(I3))*dx; %area of the analysis 
+%calculate cumulative distribution of crater occurence
+for i=1:length(bins)
+    Ncum(i) = sum(2*radii>bins(i));
+end
+Ncum=Ncum/S;%normalize by areaof analysis
+k_fit = log(Ncum)'/[log(bins); bins*0+1];%least squares fitting in loglog scale
+% power-law represents a line in on log-log plot
+logN_pred = log([1:60])*k_fit(1) + k_fit(2); %predicted value of log cumulative frequency
+% solve Neukum and Ivanov (1994) equation and find age
+t_estim = fsolve(@(t) 5.44e-14*(exp(6.93*t)-1) + 8.38e-4*t - exp(logN_pred(1)),1);
+% plot results
+figure,
+plot(bins,Ncum,'s','MarkerSize',10),hold on, 
+plot([1:60], exp(logN_pred), '-r','LineWidth',2)
+title(['Estimated age: ', num2str(t_estim), 'Ga'])
+ylabel('log (Cumulative frequency) (1/km)'),xlabel('log (Crater diameter)')
+set(gca, 'XScale', 'log', 'YScale', 'log');
+%%  testing Hough transform
 % % Create a black image
 % image = zeros(500, 500, 3, 'uint8');
 % % Draw circle 1 on the image
